@@ -1,0 +1,22 @@
+[
+  {
+    "key": "NEW_VARIABLE1",
+    "value": "ne aa",
+    "description": "This is the first new variable",
+    "environment_scope": "*",
+    "masked": true,
+    "protected": true,
+    "raw": false,
+    "variable_type": "env_var"
+  },
+  {
+    "key": "NEW_VARIABLE3",
+    "value": "new value 3",
+    "description": null,
+    "environment_scope": "*",
+    "masked": false,
+    "protected": false,
+    "raw": false,
+    "variable_type": "env_var"
+  }
+]

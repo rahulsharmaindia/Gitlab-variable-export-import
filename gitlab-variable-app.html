@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Variable Uploader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    input, button {
+      margin: 10px 0;
+      padding: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+    <h1>Upload Variables</h1>
+    <input type="text" id="groupId" value="{GROUP-ID}" placeholder="Group ID" />
+    <input type="text" id="token" value="{GITLAB_TOKEN}" placeholder="Access Token" />
+    <input type="file" id="fileInput" accept=".json" />
+    <button id="uploadButton">Upload</button>
+
+  <script>
+    document.getElementById('uploadButton').addEventListener('click', () => {
+      const groupId = document.getElementById('groupId').value;
+      const token = document.getElementById('token').value;
+      const fileInput = document.getElementById('fileInput').files[0];
+
+      if (!groupId || !token || !fileInput) {
+        alert('Please provide all required inputs');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const variables = JSON.parse(event.target.result);
+          for (const variable of variables) {
+            let validationErrors = [];
+
+            if (variable.masked) {
+              // Validation for masked variable
+              if (/\s/.test(variable.value)) {
+                validationErrors.push(`The value of the masked variable '${variable.key}' must not contain spaces.`);
+              }
+              if (variable.value.length < 8) {
+                validationErrors.push(`The value of the masked variable '${variable.key}' must be at least 8 characters long.`);
+              }
+              if (/[^a-zA-Z0-9]/.test(variable.value)) {
+                validationErrors.push(`The value of the masked variable '${variable.key}' contains invalid characters. Only alphanumeric characters and @, _, -, :, + are allowed.`);
+              }
+            }
+
+            if (validationErrors.length > 0) {
+              alert(validationErrors.join('\n'));
+              return;
+            }
+
+            const formData = new URLSearchParams();
+            formData.append('key', variable.key);
+            formData.append('value', variable.value);
+            if (variable.description !== null && variable.description !== undefined) formData.append('description', variable.description);
+            if (variable.environment_scope !== null && variable.environment_scope !== undefined) formData.append('environment_scope', variable.environment_scope);
+            if (variable.masked !== null && variable.masked !== undefined) formData.append('masked', variable.masked ? 'true' : 'false');
+            if (variable.protected !== null && variable.protected !== undefined) formData.append('protected', variable.protected ? 'true' : 'false');
+            if (variable.raw !== null && variable.raw !== undefined) formData.append('raw', variable.raw ? 'true' : 'false');
+            if (variable.variable_type !== null && variable.variable_type !== undefined) formData.append('variable_type', variable.variable_type);
+
+            try {
+              const response = await fetch(`https://gitlab.com/api/v4/groups/${encodeURIComponent(groupId)}/variables`, {
+                method: 'POST',
+                headers: {
+                  'PRIVATE-TOKEN': token,
+                  'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData.toString()
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to create variable: ${variable.key}. Response: ${response.status} ${response.statusText} - ${errorText}`);
+              }
+            } catch (postError) {
+              if (postError.message.includes('has already been taken')) {
+                // Update the existing variable
+                const updateFormData = new URLSearchParams();
+                updateFormData.append('value', variable.value);
+                if (variable.description !== null && variable.description !== undefined) updateFormData.append('description', variable.description);
+                if (variable.environment_scope !== null && variable.environment_scope !== undefined) updateFormData.append('environment_scope', variable.environment_scope);
+                if (variable.masked !== null && variable.masked !== undefined) updateFormData.append('masked', variable.masked ? 'true' : 'false');
+                if (variable.protected !== null && variable.protected !== undefined) updateFormData.append('protected', variable.protected ? 'true' : 'false');
+                if (variable.raw !== null && variable.raw !== undefined) updateFormData.append('raw', variable.raw ? 'true' : 'false');
+                if (variable.variable_type !== null && variable.variable_type !== undefined) updateFormData.append('variable_type', variable.variable_type);
+
+                const updateResponse = await fetch(`https://gitlab.com/api/v4/groups/${encodeURIComponent(groupId)}/variables/${encodeURIComponent(variable.key)}`, {
+                  method: 'PUT',
+                  headers: {
+                    'PRIVATE-TOKEN': token,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                  },
+                  body: updateFormData.toString()
+                });
+
+                if (!updateResponse.ok) {
+                  const errorText = await updateResponse.text();
+                  throw new Error(`Failed to update variable: ${variable.key}. Response: ${updateResponse.status} ${updateResponse.statusText} - ${errorText}`);
+                }
+              } else {
+                throw postError;
+              }
+            }
+          }
+          alert('Variables created/updated successfully');
+        } catch (error) {
+          console.error('Error creating/updating variables:', error);
+          alert(`Failed to create/update variables. Error: ${error.message}`);
+        }
+      };
+      reader.readAsText(fileInput);
+    });
+  </script>
+</body>
+</html>
